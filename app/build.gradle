@@ -1,0 +1,48 @@
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+android {
+    namespace 'com.guyuexuan.bjxd'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.guyuexuan.bjxd"
+        minSdk 25
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}
+
+dependencies {
+    // AndroidX 核心库
+    implementation libs.appcompat
+    implementation libs.material
+    implementation libs.activity
+    implementation libs.constraintlayout
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'androidx.webkit:webkit:1.8.0'
+
+    // 网络请求相关
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'org.json:json:20231013'
+
+    // 其他工具库
+    implementation 'androidx.annotation:annotation:1.7.1'
+    implementation 'androidx.lifecycle:lifecycle-runtime:2.6.2'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel:2.6.2'
+    implementation 'androidx.lifecycle:lifecycle-livedata:2.6.2'
+}
