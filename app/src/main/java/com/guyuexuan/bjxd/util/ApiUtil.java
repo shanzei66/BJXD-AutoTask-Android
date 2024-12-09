@@ -405,7 +405,7 @@ public class ApiUtil {
     }
 
     public static void submitQuestionAnswer(String token, String questionId, String answer, String shareUserHid,
-            ApiCallback<JSONObject> callback) {
+                                            ApiCallback<JSONObject> callback) {
         JSONObject jsonBody = new JSONObject();
         try {
             jsonBody.put("answer", answer);

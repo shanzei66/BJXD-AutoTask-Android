@@ -17,8 +17,8 @@ import com.guyuexuan.bjxd.model.User;
 import java.util.List;
 
 public class UserAdapter extends RecyclerView.Adapter<UserAdapter.UserViewHolder> {
-    private List<User> userList;
     private final OnUserActionListener listener;
+    private List<User> userList;
     private OnStartDragListener dragListener;
 
     public UserAdapter(List<User> userList, OnUserActionListener listener) {

@@ -22,16 +22,26 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements UserAdapter.OnUserActionListener {
     private static final int REQUEST_ADD_USER = 1;
+    private final List<User> users = new ArrayList<>();
     private RecyclerView userList;
     private UserAdapter adapter;
     private StorageUtil storageUtil;
-    private final List<User> users = new ArrayList<>();
     private TextView accountCountText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // 修改 APP 名称后面加上 版本号
+        String versionName = "";
+        try {
+            versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        String appName = getString(R.string.app_name) + " v" + versionName;
+        setTitle(appName);
 
         storageUtil = new StorageUtil(this);
         initViews();

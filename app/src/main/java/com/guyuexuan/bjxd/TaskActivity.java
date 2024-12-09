@@ -32,17 +32,17 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
-import java.util.function.Consumer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public class TaskActivity extends AppCompatActivity {
+    private final Object answerLock = new Object();
     private TextView logTextView;
     private Button actionButton;
     private StorageUtil storageUtil;
     private TaskThread taskThread;
     private String selectedAnswer = null;
-    private final Object answerLock = new Object();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -163,8 +163,10 @@ public class TaskActivity extends AppCompatActivity {
     private static class TaskThread extends Thread {
         // 备用分享用户ID列表
         private static final String[] BACKUP_HIDS = {
+                "a6688ec1a9ee429fa7b68d50e0c92b1f",
                 "bb8cd2e44c7b45eeb8cc5f7fa71c3322",
-                "5f640c50061b400c91be326c8fe0accd"
+                "5f640c50061b400c91be326c8fe0accd",
+                "55a5d82dacd9417483ae369de9d9b82d"
         };
 
         private final List<User> users;
@@ -172,16 +174,15 @@ public class TaskActivity extends AppCompatActivity {
         private final StorageUtil storageUtil;
         private final Consumer<String> logger;
         private final Runnable onComplete;
+        private final WeakReference<TaskActivity> activityRef;
         private volatile boolean running = true;
         private int currentUserIndex = 0;
-        private final WeakReference<TaskActivity> activityRef;
-
         // 新增成员变量
         private String historicalCorrectAnswer = null; // 历史正确答案
         private List<String> wrongAnswers = new ArrayList<>(); // 错误答案列表
 
         public TaskThread(List<User> users, String aiApiKey, StorageUtil storageUtil, Consumer<String> logger,
-                Runnable onComplete, TaskActivity activity) {
+                          Runnable onComplete, TaskActivity activity) {
             this.users = users;
             this.aiApiKey = aiApiKey;
             this.storageUtil = storageUtil;
@@ -250,7 +251,7 @@ public class TaskActivity extends AppCompatActivity {
 
         /**
          * 检查任务是否需要停止
-         * 
+         *
          * @throws InterruptedException 如果任务需要停止则抛出此异常
          */
         private void checkShouldStop() throws InterruptedException {
@@ -320,8 +321,8 @@ public class TaskActivity extends AppCompatActivity {
 
             // 检查任务状态
             CountDownLatch latch = new CountDownLatch(1);
-            final TaskStatus[] taskStatus = { null };
-            final String[] error = { null };
+            final TaskStatus[] taskStatus = {null};
+            final String[] error = {null};
 
             ApiUtil.getTaskStatus(user.getToken(), new ApiCallback<TaskStatus>() {
                 @Override
@@ -358,6 +359,21 @@ public class TaskActivity extends AppCompatActivity {
 
             checkShouldStop();
 
+            // 答题任务放第一个是为了让手动答题的人可以尽快答题
+            if (!status.isQuestionCompleted()) {
+                executeQuestionTask(user);
+                // 延时 5-10 秒
+                Thread.sleep(5000 + new Random().nextInt(5000));
+            } else {
+                logger.accept("✅ 答题任务 已完成，跳过");
+                // 获取已答题答案
+                if (historicalCorrectAnswer == null) {
+                    getAnsweredAnswer(user);
+                }
+            }
+
+            checkShouldStop();
+
             // 执行未完成的任务
             if (!status.isSignCompleted()) {
                 executeSignTask(user);
@@ -376,20 +392,6 @@ public class TaskActivity extends AppCompatActivity {
             } else {
                 logger.accept("✅ 浏览文章任务 已完成，跳过");
             }
-
-            checkShouldStop();
-
-            if (!status.isQuestionCompleted()) {
-                executeQuestionTask(user);
-                // 延时 5-10 秒
-                Thread.sleep(5000 + new Random().nextInt(5000));
-            } else {
-                logger.accept("✅ 答题任务 已完成，跳过");
-                // 获取已答题答案
-                if (historicalCorrectAnswer == null) {
-                    getAnsweredAnswer(user);
-                }
-            }
         }
 
         /**
@@ -401,7 +403,7 @@ public class TaskActivity extends AppCompatActivity {
             // 记录最佳签到选项
             String bestHid = null; // 签到任务 hid
             String bestRewardHash = null; // 签到任务 rewardHash
-            final int[] bestScore = { 0 }; // 签到任务 奖励积分
+            final int[] bestScore = {0}; // 签到任务 奖励积分
             int maxAttemptCount = 5; // 最大尝试次数
 
             // 尝试多次获取签到信息
@@ -410,8 +412,8 @@ public class TaskActivity extends AppCompatActivity {
 
                 // 使用 CountDownLatch 等待异步请求完成
                 CountDownLatch latch = new CountDownLatch(1);
-                final JSONObject[] responseData = { null };
-                final String[] error = { null };
+                final JSONObject[] responseData = {null};
+                final String[] error = {null};
 
                 ApiUtil.getSignInfo(user.getToken(), new ApiCallback<JSONObject>() {
                     @Override
@@ -491,7 +493,7 @@ public class TaskActivity extends AppCompatActivity {
             if (bestHid != null && bestRewardHash != null) {
                 // 等待签到请求完成
                 CountDownLatch signLatch = new CountDownLatch(1);
-                final String[] signError = { null };
+                final String[] signError = {null};
 
                 ApiUtil.submitSign(user.getToken(), bestHid, bestRewardHash, new ApiCallback<Void>() {
                     @Override
@@ -523,8 +525,8 @@ public class TaskActivity extends AppCompatActivity {
 
             // 等待获取文章列表
             CountDownLatch articleLatch = new CountDownLatch(1);
-            final JSONObject[] articles = { null };
-            final String[] error = { null };
+            final JSONObject[] articles = {null};
+            final String[] error = {null};
 
             ApiUtil.getArticleList(user.getToken(), new ApiCallback<JSONObject>() {
                 @Override
@@ -582,7 +584,7 @@ public class TaskActivity extends AppCompatActivity {
 
                             // 等待浏览文章请求完成
                             CountDownLatch viewLatch = new CountDownLatch(1);
-                            final String[] viewError = { null };
+                            final String[] viewError = {null};
 
                             // 浏览文章
                             ApiUtil.viewArticle(user.getToken(), articleId, new ApiCallback<Void>() {
@@ -682,8 +684,8 @@ public class TaskActivity extends AppCompatActivity {
 
                 // 等待AI回答
                 CountDownLatch aiLatch = new CountDownLatch(1);
-                final String[] aiAnswer = { null };
-                final String[] aiError = { null };
+                final String[] aiAnswer = {null};
+                final String[] aiError = {null};
 
                 ApiUtil.askAI(aiApiKey, prompt, new ApiCallback<String>() {
                     @Override
@@ -725,7 +727,7 @@ public class TaskActivity extends AppCompatActivity {
             }
 
             // 使用完全随机答案
-            String[] options = { "A", "B", "C", "D" };
+            String[] options = {"A", "B", "C", "D"};
             answer = options[new Random().nextInt(options.length)];
             logger.accept("没有可用选项，使用完全随机答案: " + answer);
             return answer;
@@ -733,8 +735,8 @@ public class TaskActivity extends AppCompatActivity {
 
         private void submitQuestionAnswer(User user, String questionId, String answer) throws InterruptedException {
             CountDownLatch submitLatch = new CountDownLatch(1);
-            final JSONObject[] responseData = { null };
-            final String[] error = { null };
+            final JSONObject[] responseData = {null};
+            final String[] error = {null};
 
             ApiUtil.submitQuestionAnswer(user.getToken(), questionId, answer, user.getShareUserHid(),
                     new ApiCallback<JSONObject>() {
@@ -787,8 +789,8 @@ public class TaskActivity extends AppCompatActivity {
 
             // 等待获取题目
             CountDownLatch questionLatch = new CountDownLatch(1);
-            final JSONObject[] questionData = { null };
-            final String[] error = { null };
+            final JSONObject[] questionData = {null};
+            final String[] error = {null};
 
             ApiUtil.getQuestionInfo(user.getToken(), new ApiCallback<JSONObject>() {
                 @Override
@@ -825,6 +827,10 @@ public class TaskActivity extends AppCompatActivity {
                 // 检查答题状态
                 // state: 1=未答题 2=已答题且正确 3=答错且未有人帮忙答题 4=答错但有人帮忙答题
                 int state = data.getInt("state");
+                if (state == 3) {
+                    logger.accept("今日已答题但回答错误，当前无人帮助答题，跳过");
+                    return;
+                }
                 if (state != 1) {
                     // 尝试获取已有答案
                     if (data.has("answer")) {
@@ -861,18 +867,23 @@ public class TaskActivity extends AppCompatActivity {
                     }
                 }
 
-                logger.accept("题目:\n" + question + optionsText);
+                logger.accept("题目详情:\n" + question + optionsText);
 
-                checkShouldStop();
-
-                // 获取答案
-                String answer = getQuestionAnswer(question, optionsText.toString(), availableOptionLetters);
+                String answer;
+                // 如果 availableOptionLetters 只剩下一个选项，自动选择
+                if (availableOptionLetters.size() == 1) {
+                    answer = availableOptionLetters.get(0);
+                    logger.accept("只剩下一个选项，自动选择答案: " + answer);
+                } else {
+                    checkShouldStop();
+                    // 获取答案
+                    answer = getQuestionAnswer(question, optionsText.toString(), availableOptionLetters);
+                }
 
                 checkShouldStop();
 
                 // 提交答案
                 submitQuestionAnswer(user, questionId, answer);
-
             } catch (JSONException e) {
                 logger.accept("解析题目数据失败: " + e.getMessage());
             }
@@ -888,8 +899,8 @@ public class TaskActivity extends AppCompatActivity {
 
         private void getAnsweredAnswer(User user) throws InterruptedException {
             CountDownLatch latch = new CountDownLatch(1);
-            final JSONObject[] responseData = { null };
-            final String[] error = { null };
+            final JSONObject[] responseData = {null};
+            final String[] error = {null};
 
             ApiUtil.getQuestionInfo(user.getToken(), new ApiCallback<JSONObject>() {
                 @Override
@@ -937,8 +948,8 @@ public class TaskActivity extends AppCompatActivity {
 
         private void getScoreDetails(User user) throws InterruptedException {
             CountDownLatch latch = new CountDownLatch(1);
-            final JSONObject[] responseData = { null };
-            final String[] error = { null };
+            final JSONObject[] responseData = {null};
+            final String[] error = {null};
 
             ApiUtil.getScore(user.getToken(), new ApiCallback<JSONObject>() {
                 @Override
