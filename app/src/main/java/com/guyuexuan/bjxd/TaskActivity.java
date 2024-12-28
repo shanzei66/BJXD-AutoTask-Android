@@ -18,6 +18,7 @@ import com.guyuexuan.bjxd.model.TaskStatus;
 import com.guyuexuan.bjxd.model.User;
 import com.guyuexuan.bjxd.util.ApiCallback;
 import com.guyuexuan.bjxd.util.ApiUtil;
+import com.guyuexuan.bjxd.util.AppUtils;
 import com.guyuexuan.bjxd.util.StorageUtil;
 
 import org.json.JSONArray;
@@ -48,6 +49,9 @@ public class TaskActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_task);
+
+        // 设置标题
+        setTitle(AppUtils.getAppNameWithVersion(this));
 
         storageUtil = new StorageUtil(this);
         initViews();

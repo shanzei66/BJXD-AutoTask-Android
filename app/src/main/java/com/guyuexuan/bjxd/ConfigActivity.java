@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.textfield.TextInputEditText;
+import com.guyuexuan.bjxd.util.AppUtils;
 import com.guyuexuan.bjxd.util.StorageUtil;
 
 import java.util.Objects;
@@ -20,6 +21,9 @@ public class ConfigActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_config);
+
+        // 设置标题
+        setTitle(AppUtils.getAppNameWithVersion(this));
 
         storageUtil = new StorageUtil(this);
 

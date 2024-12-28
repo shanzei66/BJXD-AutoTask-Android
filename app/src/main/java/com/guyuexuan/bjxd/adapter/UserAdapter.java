@@ -1,5 +1,8 @@
 package com.guyuexuan.bjxd.adapter;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -7,6 +10,7 @@ import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -42,6 +46,15 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.UserViewHolder
     public void onBindViewHolder(@NonNull UserViewHolder holder, int position) {
         User user = userList.get(position);
         holder.bind(user, position + 1, listener, dragListener);
+
+        holder.copyButton.setOnClickListener(v -> {
+            // 复制 token 到剪切板
+            ClipboardManager clipboard = (ClipboardManager) holder.itemView.getContext()
+                    .getSystemService(Context.CLIPBOARD_SERVICE);
+            ClipData clip = ClipData.newPlainText("Token", user.getToken());
+            clipboard.setPrimaryClip(clip);
+            Toast.makeText(holder.itemView.getContext(), "Token 已复制", Toast.LENGTH_SHORT).show();
+        });
     }
 
     @Override
@@ -70,6 +83,7 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.UserViewHolder
         private final TextView phoneText;
         private final ImageButton deleteButton;
         private final ImageView dragHandle;
+        private final ImageButton copyButton;
 
         private OnUserActionListener listener;
         private OnStartDragListener dragListener;
@@ -81,6 +95,7 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.UserViewHolder
             phoneText = itemView.findViewById(R.id.phoneText);
             deleteButton = itemView.findViewById(R.id.deleteButton);
             dragHandle = itemView.findViewById(R.id.dragHandle);
+            copyButton = itemView.findViewById(R.id.copyButton);
         }
 
         public void bind(User user, int order, OnUserActionListener listener, OnStartDragListener dragListener) {

@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.guyuexuan.bjxd.adapter.UserAdapter;
 import com.guyuexuan.bjxd.model.User;
+import com.guyuexuan.bjxd.util.AppUtils;
 import com.guyuexuan.bjxd.util.StorageUtil;
 
 import java.util.ArrayList;
@@ -33,15 +34,8 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // 修改 APP 名称后面加上 版本号
-        String versionName = "";
-        try {
-            versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        String appName = getString(R.string.app_name) + " v" + versionName;
-        setTitle(appName);
+        // 设置标题
+        setTitle(AppUtils.getAppNameWithVersion(this));
 
         storageUtil = new StorageUtil(this);
         initViews();

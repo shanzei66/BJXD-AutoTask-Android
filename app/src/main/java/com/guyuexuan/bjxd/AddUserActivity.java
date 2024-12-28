@@ -1,8 +1,11 @@
 package com.guyuexuan.bjxd;
 
+import android.app.AlertDialog;
 import android.os.Bundle;
+import android.text.InputType;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -10,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.guyuexuan.bjxd.model.User;
 import com.guyuexuan.bjxd.util.ApiCallback;
 import com.guyuexuan.bjxd.util.ApiUtil;
+import com.guyuexuan.bjxd.util.AppUtils;
 import com.guyuexuan.bjxd.util.StorageUtil;
 
 public class AddUserActivity extends AppCompatActivity {
@@ -20,6 +24,9 @@ public class AddUserActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_user);
+
+        // 设置标题
+        setTitle(AppUtils.getAppNameWithVersion(this));
 
         storageUtil = new StorageUtil(this);
         initViews();
@@ -32,6 +39,11 @@ public class AddUserActivity extends AppCompatActivity {
         // 添加账号按钮点击事件
         findViewById(R.id.addUserButton).setOnClickListener(v -> {
             extractToken();
+        });
+
+        // 手动添加账号按钮点击事件
+        findViewById(R.id.manualAddUserButton).setOnClickListener(v -> {
+            showTokenInputDialog();
         });
 
         // 返回按钮点击事件
@@ -95,5 +107,32 @@ public class AddUserActivity extends AppCompatActivity {
                 });
             }
         });
+    }
+
+    // 显示输入框以手动输入 token
+    private void showTokenInputDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("手动输入 Token");
+
+        // 创建输入框
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+        // 设置确认按钮
+        builder.setPositiveButton("确认", (dialog, which) -> {
+            String token = input.getText().toString().trim();
+            if (!token.isEmpty()) {
+                addUser(token); // 调用 addUser 方法
+            } else {
+                Toast.makeText(this, "Token 不能为空", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // 设置取消按钮
+        builder.setNegativeButton("取消", (dialog, which) -> dialog.cancel());
+
+        // 显示对话框
+        builder.show();
     }
 }
