@@ -5,6 +5,8 @@ import android.os.Bundle;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -22,12 +24,21 @@ import java.util.Collections;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements UserAdapter.OnUserActionListener {
-    private static final int REQUEST_ADD_USER = 1;
     private final List<User> users = new ArrayList<>();
     private RecyclerView userList;
     private UserAdapter adapter;
     private StorageUtil storageUtil;
     private TextView accountCountText;
+
+    // 定义 ActivityResultLauncher
+    private final ActivityResultLauncher<Intent> addUserLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == MainActivity.RESULT_OK) {
+                    // 刷新用户列表
+                    refreshUserList();
+                }
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,7 +62,7 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
         userList.setAdapter(adapter);
 
         findViewById(R.id.addUserButton).setOnClickListener(v -> {
-            startActivityForResult(new Intent(this, AddUserActivity.class), REQUEST_ADD_USER);
+            openAddUserActivity();
         });
 
         findViewById(R.id.configButton).setOnClickListener(v -> {
@@ -79,10 +90,10 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
 
             @Override
             public boolean onMove(@NonNull RecyclerView recyclerView,
-                                  @NonNull RecyclerView.ViewHolder viewHolder,
-                                  @NonNull RecyclerView.ViewHolder target) {
-                int fromPosition = viewHolder.getAdapterPosition();
-                int toPosition = target.getAdapterPosition();
+                    @NonNull RecyclerView.ViewHolder viewHolder,
+                    @NonNull RecyclerView.ViewHolder target) {
+                int fromPosition = viewHolder.getBindingAdapterPosition();
+                int toPosition = target.getBindingAdapterPosition();
                 Collections.swap(users, fromPosition, toPosition);
                 adapter.notifyItemMoved(fromPosition, toPosition);
 
@@ -90,7 +101,7 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
                 for (int i = 0; i < recyclerView.getChildCount(); i++) {
                     RecyclerView.ViewHolder holder = recyclerView.getChildViewHolder(recyclerView.getChildAt(i));
                     if (holder instanceof UserAdapter.UserViewHolder) {
-                        ((UserAdapter.UserViewHolder) holder).updateOrder(holder.getAdapterPosition() + 1);
+                        ((UserAdapter.UserViewHolder) holder).updateOrder(holder.getBindingAdapterPosition() + 1);
                     }
                 }
 
@@ -106,7 +117,7 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
                 super.clearView(recyclerView, viewHolder);
                 if (isDragging) {
                     isDragging = false;
-                    onMoveUser(viewHolder.getAdapterPosition(), viewHolder.getAdapterPosition());
+                    onMoveUser(viewHolder.getBindingAdapterPosition(), viewHolder.getBindingAdapterPosition());
                 }
             }
 
@@ -125,7 +136,7 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
     }
 
     private void updateAccountCount() {
-        accountCountText.setText(String.format("当前共有 %d 个账号", users.size()));
+        accountCountText.setText(String.format("Token 有效期 28 天，过期后重新添加即可。\n当前共有 %d 个账号", users.size()));
     }
 
     private void loadUsers() {
@@ -168,12 +179,12 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
         storageUtil.saveUsers(users);
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_ADD_USER && resultCode == RESULT_OK) {
-            // 用户添加成功，刷新列表
-            loadUsers();
-        }
+    private void openAddUserActivity() {
+        // 使用新的方式启动 Activity
+        addUserLauncher.launch(new Intent(this, AddUserActivity.class));
+    }
+
+    private void refreshUserList() {
+        loadUsers();
     }
 }

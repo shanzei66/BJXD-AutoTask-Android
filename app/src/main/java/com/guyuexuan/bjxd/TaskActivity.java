@@ -16,13 +16,11 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.guyuexuan.bjxd.model.TaskStatus;
 import com.guyuexuan.bjxd.model.User;
-import com.guyuexuan.bjxd.util.ApiCallback;
 import com.guyuexuan.bjxd.util.ApiUtil;
 import com.guyuexuan.bjxd.util.AppUtils;
 import com.guyuexuan.bjxd.util.StorageUtil;
 
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.lang.ref.WeakReference;
@@ -33,8 +31,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class TaskActivity extends AppCompatActivity {
@@ -224,10 +220,6 @@ public class TaskActivity extends AppCompatActivity {
                 }
 
                 logger.accept(String.format("\nRUN: 积分详情, 共 %d 个账号", users.size()));
-                for (User user : users) {
-                    // 获取积分并打印
-                }
-
                 logger.accept(String.format("\n============ 积分详情 ============"));
                 for (int i = 0; i < users.size(); i++) {
                     User user = users.get(i);
@@ -323,78 +315,47 @@ public class TaskActivity extends AppCompatActivity {
             logger.accept(String.format("🆔 用户hid: %s", user.getHid()));
             logger.accept(String.format("🆔 分享hid: %s", user.getShareUserHid()));
 
-            // 检查任务状态
-            CountDownLatch latch = new CountDownLatch(1);
-            final TaskStatus[] taskStatus = {null};
-            final String[] error = {null};
+            try {
+                // 检查任务状态
+                TaskStatus status = ApiUtil.getTaskStatus(user.getToken());
 
-            ApiUtil.getTaskStatus(user.getToken(), new ApiCallback<TaskStatus>() {
-                @Override
-                public void onSuccess(TaskStatus status) {
-                    taskStatus[0] = status;
-                    latch.countDown();
+                checkShouldStop();
+
+                // 答题任务放第一个是为了让手动答题的人可以尽快答题
+                if (!status.isQuestionCompleted()) {
+                    executeQuestionTask(user);
+                    // 延时 5-10 秒
+                    Thread.sleep(5000 + new Random().nextInt(5000));
+                } else {
+                    logger.accept("✅ 答题任务 已完成，跳过");
+                    // 获取已答题答案
+                    if (historicalCorrectAnswer == null) {
+                        getAnsweredAnswer(user);
+                    }
                 }
 
-                @Override
-                public void onError(String err) {
-                    error[0] = err;
-                    latch.countDown();
+                checkShouldStop();
+
+                // 执行未完成的任务
+                if (!status.isSignCompleted()) {
+                    executeSignTask(user);
+                    // 延时 5-10 秒
+                    Thread.sleep(5000 + new Random().nextInt(5000));
+                } else {
+                    logger.accept("✅ 签到任务 已完成，跳过");
                 }
-            });
 
-            // 等待获取任务状态
-            if (!latch.await(10, TimeUnit.SECONDS)) {
-                logger.accept("获取任务状态超时");
-                return;
-            }
+                checkShouldStop();
 
-            // 检查是否有错误
-            if (error[0] != null) {
-                logger.accept("❌ 获取任务状态失败: " + error[0]);
-                return;
-            }
-
-            // 测试
-            // executeSignTask(user);
-            // executeViewTask(user);
-            // executeQuestionTask(user);
-
-            TaskStatus status = taskStatus[0];
-
-            checkShouldStop();
-
-            // 答题任务放第一个是为了让手动答题的人可以尽快答题
-            if (!status.isQuestionCompleted()) {
-                executeQuestionTask(user);
-                // 延时 5-10 秒
-                Thread.sleep(5000 + new Random().nextInt(5000));
-            } else {
-                logger.accept("✅ 答题任务 已完成，跳过");
-                // 获取已答题答案
-                if (historicalCorrectAnswer == null) {
-                    getAnsweredAnswer(user);
+                if (!status.isViewCompleted()) {
+                    executeViewTask(user);
+                    // 延时 5-10 秒
+                    Thread.sleep(5000 + new Random().nextInt(5000));
+                } else {
+                    logger.accept("✅ 浏览文章任务 已完成，跳过");
                 }
-            }
-
-            checkShouldStop();
-
-            // 执行未完成的任务
-            if (!status.isSignCompleted()) {
-                executeSignTask(user);
-                // 延时 5-10 秒
-                Thread.sleep(5000 + new Random().nextInt(5000));
-            } else {
-                logger.accept("✅ 签到任务 已完成，跳过");
-            }
-
-            checkShouldStop();
-
-            if (!status.isViewCompleted()) {
-                executeViewTask(user);
-                // 延时 5-10 秒
-                Thread.sleep(5000 + new Random().nextInt(5000));
-            } else {
-                logger.accept("✅ 浏览文章任务 已完成，跳过");
+            } catch (Exception e) {
+                logger.accept("执行任务出错: " + e.getMessage());
             }
         }
 
@@ -407,49 +368,15 @@ public class TaskActivity extends AppCompatActivity {
             // 记录最佳签到选项
             String bestHid = null; // 签到任务 hid
             String bestRewardHash = null; // 签到任务 rewardHash
-            final int[] bestScore = {0}; // 签到任务 奖励积分
+            int bestScore = 0; // 签到任务 奖励积分
             int maxAttemptCount = 5; // 最大尝试次数
 
             // 尝试多次获取签到信息
             for (int i = 0; i < maxAttemptCount; i++) {
                 checkShouldStop();
 
-                // 使用 CountDownLatch 等待异步请求完成
-                CountDownLatch latch = new CountDownLatch(1);
-                final JSONObject[] responseData = {null};
-                final String[] error = {null};
-
-                ApiUtil.getSignInfo(user.getToken(), new ApiCallback<JSONObject>() {
-                    @Override
-                    public void onSuccess(JSONObject data) {
-                        responseData[0] = data;
-                        latch.countDown();
-                    }
-
-                    @Override
-                    public void onError(String err) {
-                        error[0] = err;
-                        latch.countDown();
-                    }
-                });
-
-                // 等待请求完成或超时
-                if (!latch.await(5, TimeUnit.SECONDS)) {
-                    logger.accept("获取签到信息超时");
-                    continue;
-                }
-
-                // 检查是否有错误
-                if (error[0] != null) {
-                    logger.accept("获取签到信息失败: " + error[0]);
-                    continue;
-                }
-
-                checkShouldStop();
-
-                // 解析响应数据
                 try {
-                    JSONObject data = responseData[0];
+                    JSONObject data = ApiUtil.getSignInfo(user.getToken());
                     String hid = data.getString("hid");
                     String rewardHash = data.getString("rewardHash");
                     int currentBestScore = 0;
@@ -464,18 +391,18 @@ public class TaskActivity extends AppCompatActivity {
                     }
 
                     // 更新最佳选项
-                    if (currentBestScore > bestScore[0]) {
-                        bestScore[0] = currentBestScore;
+                    if (currentBestScore > bestScore) {
+                        bestScore = currentBestScore;
                         bestHid = hid;
                         bestRewardHash = rewardHash;
                     }
                     // 打印当前尝试的签到信息
                     logger.accept(String.format("第 %d 次尝试: score=%d hid=%s rewardHash=%s",
                             i + 1, currentBestScore, hid, rewardHash));
-                    logger.accept(String.format("当前可获得签到积分: %d", bestScore[0]));
+                    logger.accept(String.format("当前可获得签到积分: %d", bestScore));
 
-                } catch (JSONException e) {
-                    logger.accept("解析签到数据失败: " + e.getMessage());
+                } catch (Exception e) {
+                    logger.accept("获取签到信息失败: " + e.getMessage());
                 }
 
                 // 延时
@@ -495,27 +422,12 @@ public class TaskActivity extends AppCompatActivity {
 
             // 如果找到了最佳选项，执行签到
             if (bestHid != null && bestRewardHash != null) {
-                // 等待签到请求完成
-                CountDownLatch signLatch = new CountDownLatch(1);
-                final String[] signError = {null};
-
-                ApiUtil.submitSign(user.getToken(), bestHid, bestRewardHash, new ApiCallback<Void>() {
-                    @Override
-                    public void onSuccess(Void result) {
-                        logger.accept(String.format("✅ 签到成功: 积分+%d", bestScore[0]));
-                        signLatch.countDown();
-                    }
-
-                    @Override
-                    public void onError(String error) {
-                        logger.accept(String.format("❌ 签到失败: %s", error));
-                        signError[0] = error;
-                        signLatch.countDown();
-                    }
-                });
-
-                // 等待签到完成
-                signLatch.await(10, TimeUnit.SECONDS);
+                try {
+                    ApiUtil.submitSign(user.getToken(), bestHid, bestRewardHash);
+                    logger.accept(String.format("✅ 签到成功: 积分+%d", bestScore));
+                } catch (Exception e) {
+                    logger.accept("❌ 签到失败: " + e.getMessage());
+                }
             } else {
                 logger.accept("未找到可用的签到选项");
             }
@@ -527,122 +439,56 @@ public class TaskActivity extends AppCompatActivity {
         private void executeViewTask(User user) throws InterruptedException {
             logger.accept("🔍 开始执行浏览文章任务");
 
-            // 等待获取文章列表
-            CountDownLatch articleLatch = new CountDownLatch(1);
-            final JSONObject[] articles = {null};
-            final String[] error = {null};
-
-            ApiUtil.getArticleList(user.getToken(), new ApiCallback<JSONObject>() {
-                @Override
-                public void onSuccess(JSONObject data) {
-                    articles[0] = data;
-                    articleLatch.countDown();
-                }
-
-                @Override
-                public void onError(String err) {
-                    error[0] = err;
-                    articleLatch.countDown();
-                }
-            });
-
-            // 等待文章列表请求完成
-            if (!articleLatch.await(5, TimeUnit.SECONDS)) {
-                logger.accept("获取文章列表超时");
-                return;
-            }
-
-            // 检查是否有错误
-            if (error[0] != null) {
-                logger.accept("获取文章列表失败: " + error[0]);
-                return;
-            }
-
-            // 检查是否需要停止
-            checkShouldStop();
-
             try {
-                if (articles[0] != null) {
-                    // 获取文章列表
-                    JSONArray list = articles[0].getJSONArray("list");
-                    if (list.length() > 0) {
-                        // 收集所有文章的 hid
-                        List<String> articleHids = new ArrayList<>();
-                        for (int i = 0; i < list.length(); i++) {
-                            articleHids.add(list.getJSONObject(i).getString("hid"));
-                        }
-                        // 打乱顺序
-                        Collections.shuffle(articleHids);
+                JSONObject articles = ApiUtil.getArticleList(user.getToken());
 
-                        // 选择前3篇文章（如果文章数量不足3篇，则全部选择）
-                        int articlesToRead = Math.min(3, articleHids.size());
-                        logger.accept(String.format("需要浏览 %d 篇文章", articlesToRead));
+                // 获取文章列表
+                JSONArray list = articles.getJSONArray("list");
+                if (list.length() > 0) {
+                    // 收集所有文章的 hid
+                    List<String> articleHids = new ArrayList<>();
+                    for (int i = 0; i < list.length(); i++) {
+                        articleHids.add(list.getJSONObject(i).getString("hid"));
+                    }
+                    // 打乱顺序
+                    Collections.shuffle(articleHids);
 
-                        // 循环 浏览文章
-                        for (int i = 0; i < articlesToRead; i++) {
-                            checkShouldStop();
+                    // 选择前3篇文章（如果文章数量不足3篇，则全部选择）
+                    int articlesToRead = Math.min(3, articleHids.size());
+                    logger.accept(String.format("需要浏览 %d 篇文章", articlesToRead));
 
-                            String articleId = articleHids.get(i);
-                            logger.accept(
-                                    String.format("\n浏览第 %d/%d 篇文章: hid=%s", i + 1, articlesToRead, articleId));
+                    // 循环浏览文章
+                    for (int i = 0; i < articlesToRead; i++) {
+                        checkShouldStop();
 
-                            // 等待浏览文章请求完成
-                            CountDownLatch viewLatch = new CountDownLatch(1);
-                            final String[] viewError = {null};
+                        String articleId = articleHids.get(i);
+                        logger.accept(String.format("\n浏览第 %d/%d 篇文章: hid=%s", i + 1, articlesToRead, articleId));
 
-                            // 浏览文章
-                            ApiUtil.viewArticle(user.getToken(), articleId, new ApiCallback<Void>() {
-                                @Override
-                                public void onSuccess(Void result) {
-                                    viewLatch.countDown();
-                                }
-
-                                @Override
-                                public void onError(String err) {
-                                    logger.accept(String.format("❌ 浏览文章失败: %s", err));
-                                    viewError[0] = err;
-                                    viewLatch.countDown();
-                                }
-                            });
-
-                            // 等待浏览文章完成
-                            if (!viewLatch.await(5, TimeUnit.SECONDS)) {
-                                logger.accept("浏览文章超时");
-                            }
-
+                        try {
+                            ApiUtil.viewArticle(user.getToken(), articleId);
                             // 延时 10-15 秒
                             logger.accept("浏览文章 10-15 秒");
                             Thread.sleep(11000 + new Random().nextInt(4000));
+                        } catch (Exception e) {
+                            logger.accept(String.format("❌ 浏览文章失败: %s", e.getMessage()));
                         }
+                    }
 
-                        checkShouldStop();
+                    checkShouldStop();
 
-                        // 提交文章积分
-                        ApiUtil.submitArticleScore(user.getToken(), new ApiCallback<JSONObject>() {
-                            @Override
-                            public void onSuccess(JSONObject data) {
-                                try {
-                                    int score = data.getInt("score");
-                                    logger.accept(String.format("✅ 浏览文章成功: 积分+%d", score));
-                                } catch (JSONException e) {
-                                    logger.accept("✅ 浏览文章成功");
-                                    logger.accept("解析积分数据失败: " + e.getMessage());
-                                }
-                            }
-
-                            @Override
-                            public void onError(String error) {
-                                logger.accept(String.format("❌ 浏览文章失败: %s", error));
-                            }
-                        });
-                    } else {
-                        logger.accept("❌ 没有可浏览的文章");
+                    // 提交文章积分
+                    try {
+                        JSONObject data = ApiUtil.submitArticleScore(user.getToken());
+                        int score = data.getInt("score");
+                        logger.accept(String.format("✅ 浏览文章成功: 积分+%d", score));
+                    } catch (Exception e) {
+                        logger.accept("❌ 提交文章积分失败: " + e.getMessage());
                     }
                 } else {
-                    logger.accept("❌ 获取文章列表为空");
+                    logger.accept("❌ 没有可浏览的文章");
                 }
-            } catch (JSONException e) {
-                logger.accept("解析文章数据失败: " + e.getMessage());
+            } catch (Exception e) {
+                logger.accept("获取文章列表失败: " + e.getMessage());
             }
         }
 
@@ -686,40 +532,20 @@ public class TaskActivity extends AppCompatActivity {
                 String prompt = "你是一个专业的北京现代汽车专家，请直接给出这个单选题的答案，并且不要带'答案'等其他内容。\n" +
                         question + optionsText;
 
-                // 等待AI回答
-                CountDownLatch aiLatch = new CountDownLatch(1);
-                final String[] aiAnswer = {null};
-                final String[] aiError = {null};
-
-                ApiUtil.askAI(aiApiKey, prompt, new ApiCallback<String>() {
-                    @Override
-                    public void onSuccess(String result) {
-                        aiAnswer[0] = result;
-                        aiLatch.countDown();
-                    }
-
-                    @Override
-                    public void onError(String err) {
-                        aiError[0] = err;
-                        aiLatch.countDown();
-                    }
-                });
-
-                // 等待AI回答完成
-                if (!aiLatch.await(30, TimeUnit.SECONDS)) {
-                    logger.accept("AI 回答超时");
-                } else if (aiError[0] != null) {
-                    logger.accept("AI 请求失败: " + aiError[0]);
-                } else {
+                try {
+                    String aiResult = ApiUtil.askAI(aiApiKey, prompt);
                     // 提取答案中的选项字母
-                    String aiResult = aiAnswer[0].replaceAll("[^A-D]", "");
-                    if (aiResult.length() > 0 && availableOptionLetters.contains(String.valueOf(aiResult.charAt(0)))) {
-                        answer = String.valueOf(aiResult.charAt(0));
+                    String extractedAnswer = aiResult.replaceAll("[^A-D]", "");
+                    if (extractedAnswer.length() > 0
+                            && availableOptionLetters.contains(String.valueOf(extractedAnswer.charAt(0)))) {
+                        answer = String.valueOf(extractedAnswer.charAt(0));
                         logger.accept("使用 AI 答案: " + answer);
                         return answer;
                     } else {
-                        logger.accept("AI 回答无效或不在可用选项中: " + aiAnswer[0]);
+                        logger.accept("AI 回答无效或不在可用选项中: " + aiResult);
                     }
+                } catch (Exception e) {
+                    logger.accept("AI 请求失败: " + e.getMessage());
                 }
             }
 
@@ -737,95 +563,11 @@ public class TaskActivity extends AppCompatActivity {
             return answer;
         }
 
-        private void submitQuestionAnswer(User user, String questionId, String answer) throws InterruptedException {
-            CountDownLatch submitLatch = new CountDownLatch(1);
-            final JSONObject[] responseData = {null};
-            final String[] error = {null};
-
-            ApiUtil.submitQuestionAnswer(user.getToken(), questionId, answer, user.getShareUserHid(),
-                    new ApiCallback<JSONObject>() {
-                        @Override
-                        public void onSuccess(JSONObject data) {
-                            responseData[0] = data;
-                            submitLatch.countDown();
-                        }
-
-                        @Override
-                        public void onError(String err) {
-                            error[0] = err;
-                            submitLatch.countDown();
-                        }
-                    });
-
-            // 等待提交完成
-            if (!submitLatch.await(10, TimeUnit.SECONDS)) {
-                logger.accept("提交答案超时");
-                return;
-            }
-
-            // 检查是否有错误
-            if (error[0] != null) {
-                logger.accept("提交答案失败: " + error[0]);
-                return;
-            }
-
-            try {
-                JSONObject data = responseData[0];
-                int state = data.getInt("state");
-                if (state == 3) { // 答错且未有人帮忙答题
-                    wrongAnswers.add(answer);
-                    if (historicalCorrectAnswer == answer) {
-                        historicalCorrectAnswer = null;
-                    }
-                    logger.accept("❌ 答题错误");
-                } else if (state == 2) { // 答题正确
-                    historicalCorrectAnswer = answer;
-                    int score = data.getInt("answer_score");
-                    logger.accept(String.format("✅ 答题正确 | 积分+%d", score));
-                }
-            } catch (JSONException e) {
-                logger.accept("解析答题结果失败: " + e.getMessage());
-            }
-        }
-
         private void executeQuestionTask(User user) throws InterruptedException {
             logger.accept("🔍 开始执行答题任务");
 
-            // 等待获取题目
-            CountDownLatch questionLatch = new CountDownLatch(1);
-            final JSONObject[] questionData = {null};
-            final String[] error = {null};
-
-            ApiUtil.getQuestionInfo(user.getToken(), new ApiCallback<JSONObject>() {
-                @Override
-                public void onSuccess(JSONObject data) {
-                    questionData[0] = data;
-                    questionLatch.countDown();
-                }
-
-                @Override
-                public void onError(String err) {
-                    error[0] = err;
-                    questionLatch.countDown();
-                }
-            });
-
-            // 等待获取题目完成
-            if (!questionLatch.await(5, TimeUnit.SECONDS)) {
-                logger.accept("获取题目超时");
-                return;
-            }
-
-            // 检查是否有错误
-            if (error[0] != null) {
-                logger.accept("获取题目失败: " + error[0]);
-                return;
-            }
-
-            checkShouldStop();
-
             try {
-                JSONObject data = questionData[0];
+                JSONObject data = ApiUtil.getQuestionInfo(user.getToken());
                 JSONObject questionInfo = data.getJSONObject("question_info");
 
                 // 检查答题状态
@@ -887,9 +629,22 @@ public class TaskActivity extends AppCompatActivity {
                 checkShouldStop();
 
                 // 提交答案
-                submitQuestionAnswer(user, questionId, answer);
-            } catch (JSONException e) {
-                logger.accept("解析题目数据失败: " + e.getMessage());
+                JSONObject result = ApiUtil.submitQuestionAnswer(user.getToken(), questionId, answer,
+                        user.getShareUserHid());
+                int submitAnswerState = result.getInt("state");
+                if (submitAnswerState == 3) { // 答错且未有人帮忙答题
+                    wrongAnswers.add(answer);
+                    if (historicalCorrectAnswer == answer) {
+                        historicalCorrectAnswer = null;
+                    }
+                    logger.accept("❌ 答题错误");
+                } else if (submitAnswerState == 2) { // 答题正确
+                    historicalCorrectAnswer = answer;
+                    int score = result.getInt("answer_score");
+                    logger.accept(String.format("✅ 答题正确 | 积分+%d", score));
+                }
+            } catch (Exception e) {
+                logger.accept("答题失败: " + e.getMessage());
             }
         }
 
@@ -902,38 +657,8 @@ public class TaskActivity extends AppCompatActivity {
         }
 
         private void getAnsweredAnswer(User user) throws InterruptedException {
-            CountDownLatch latch = new CountDownLatch(1);
-            final JSONObject[] responseData = {null};
-            final String[] error = {null};
-
-            ApiUtil.getQuestionInfo(user.getToken(), new ApiCallback<JSONObject>() {
-                @Override
-                public void onSuccess(JSONObject data) {
-                    responseData[0] = data;
-                    latch.countDown();
-                }
-
-                @Override
-                public void onError(String err) {
-                    error[0] = err;
-                    latch.countDown();
-                }
-            });
-
-            // 等待请求完成
-            if (!latch.await(10, TimeUnit.SECONDS)) {
-                logger.accept("从已答题账号获取问题超时");
-                return;
-            }
-
-            // 检查是否有错误
-            if (error[0] != null) {
-                logger.accept("从已答题账号获取问题失败: " + error[0]);
-                return;
-            }
-
             try {
-                JSONObject data = responseData[0];
+                JSONObject data = ApiUtil.getQuestionInfo(user.getToken());
                 if (data.has("answer")) {
                     String answerText = data.getString("answer");
                     // 从 "C.6个" 格式中提取 "C"
@@ -945,44 +670,14 @@ public class TaskActivity extends AppCompatActivity {
                     }
                 }
                 logger.accept("从已答题账号获取答案失败");
-            } catch (JSONException e) {
-                logger.accept("解析答题结果失败: " + e.getMessage());
+            } catch (Exception e) {
+                logger.accept("从已答题账号获取问题失败: " + e.getMessage());
             }
         }
 
         private void getScoreDetails(User user) throws InterruptedException {
-            CountDownLatch latch = new CountDownLatch(1);
-            final JSONObject[] responseData = {null};
-            final String[] error = {null};
-
-            ApiUtil.getScore(user.getToken(), new ApiCallback<JSONObject>() {
-                @Override
-                public void onSuccess(JSONObject data) {
-                    responseData[0] = data;
-                    latch.countDown();
-                }
-
-                @Override
-                public void onError(String err) {
-                    error[0] = err;
-                    latch.countDown();
-                }
-            });
-
-            // 等待获取积分信息
-            if (!latch.await(10, TimeUnit.SECONDS)) {
-                logger.accept("获取积分信息超时");
-                return;
-            }
-
-            // 检查是否有错误
-            if (error[0] != null) {
-                logger.accept("获取积分信息失败: " + error[0]);
-                return;
-            }
-
             try {
-                JSONObject data = responseData[0];
+                JSONObject data = ApiUtil.getScore(user.getToken());
                 int totalScore = data.getInt("score");
 
                 // 获取今日日期
@@ -1026,8 +721,8 @@ public class TaskActivity extends AppCompatActivity {
                 } else {
                     logger.accept("今日暂无积分变动");
                 }
-            } catch (JSONException e) {
-                logger.accept("解析积分数据失败: " + e.getMessage());
+            } catch (Exception e) {
+                logger.accept("获取积分信息失败: " + e.getMessage());
             }
         }
     }

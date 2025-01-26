@@ -11,10 +11,13 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.guyuexuan.bjxd.model.User;
-import com.guyuexuan.bjxd.util.ApiCallback;
 import com.guyuexuan.bjxd.util.ApiUtil;
 import com.guyuexuan.bjxd.util.AppUtils;
 import com.guyuexuan.bjxd.util.StorageUtil;
+
+import java.net.InetAddress;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class AddUserActivity extends AppCompatActivity {
     private StorageUtil storageUtil;
@@ -86,10 +89,18 @@ public class AddUserActivity extends AppCompatActivity {
      * @param token 用户token
      */
     private void addUser(String token) {
-        ApiUtil.getUserInfo(token, new ApiCallback<User>() {
-            @Override
-            public void onSuccess(User user) {
+        // 在后台线程中执行网络请求
+        new Thread(() -> {
+            try {
+                // 同步调用获取用户信息
+                User user = ApiUtil.getUserInfo(token);
+
+                // 在主线程中更新 UI
                 runOnUiThread(() -> {
+                    // 获取当前时间
+                    String currentTime = new SimpleDateFormat("MM-dd HH:mm").format(new Date());
+                    user.setAddedTime(currentTime); // 设置添加时间
+
                     // 保存用户信息
                     StorageUtil storageUtil = new StorageUtil(AddUserActivity.this);
                     storageUtil.addUser(user);
@@ -98,15 +109,13 @@ public class AddUserActivity extends AppCompatActivity {
                     setResult(RESULT_OK);
                     finish();
                 });
-            }
-
-            @Override
-            public void onError(String error) {
+            } catch (Exception e) {
+                // 在主线程中显示错误信息
                 runOnUiThread(() -> {
-                    Toast.makeText(AddUserActivity.this, "获取用户信息失败: " + error, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(AddUserActivity.this, "获取用户信息失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
             }
-        });
+        }).start();
     }
 
     // 显示输入框以手动输入 token
@@ -123,6 +132,7 @@ public class AddUserActivity extends AppCompatActivity {
         builder.setPositiveButton("确认", (dialog, which) -> {
             String token = input.getText().toString().trim();
             if (!token.isEmpty()) {
+                Toast.makeText(this, "正在检查用户信息……", Toast.LENGTH_SHORT).show();
                 addUser(token); // 调用 addUser 方法
             } else {
                 Toast.makeText(this, "Token 不能为空", Toast.LENGTH_SHORT).show();

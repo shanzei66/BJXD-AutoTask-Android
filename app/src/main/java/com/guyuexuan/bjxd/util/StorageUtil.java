@@ -44,7 +44,7 @@ public class StorageUtil {
     }
 
     public boolean isManualAnswer() {
-        return prefs.getBoolean(KEY_MANUAL_ANSWER, false);
+        return prefs.getBoolean(KEY_MANUAL_ANSWER, true);
     }
 
     public void setManualAnswer(boolean enabled) {

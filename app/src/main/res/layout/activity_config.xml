@@ -23,6 +23,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="16dp"
+        android:checked="true"
         android:text="答题时通过弹窗手动选择答案"
         app:layout_constraintTop_toBottomOf="@id/apiKeyInputLayout" />
 

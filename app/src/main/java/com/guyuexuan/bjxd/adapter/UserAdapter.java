@@ -55,6 +55,11 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.UserViewHolder
             clipboard.setPrimaryClip(clip);
             Toast.makeText(holder.itemView.getContext(), "Token 已复制", Toast.LENGTH_SHORT).show();
         });
+
+        // 更新显示昵称和添加时间
+        if (user.getAddedTime() != null && !user.getAddedTime().isEmpty()) {
+            holder.phoneText.setText(user.getMaskedPhone() + "\n" + user.getAddedTime()); // 显示两行
+        }
     }
 
     @Override
@@ -104,8 +109,11 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.UserViewHolder
 
             orderText.setText(String.valueOf(order));
             nicknameText.setText(user.getNickname());
-            phoneText.setText(user.getMaskedPhone());
-
+            if (user.getAddedTime() != null && !user.getAddedTime().isEmpty()) {
+                phoneText.setText(user.getMaskedPhone() + "\n" + user.getAddedTime());
+            } else {
+                phoneText.setText(user.getMaskedPhone());
+            }
             deleteButton.setOnClickListener(v -> {
                 if (this.listener != null) {
                     this.listener.onDeleteUser(user);

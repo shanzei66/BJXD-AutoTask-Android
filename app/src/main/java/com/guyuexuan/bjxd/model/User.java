@@ -10,6 +10,7 @@ public class User {
     private final String hid;
     private String shareUserHid = "";
     private int order;
+    private String addedTime;
 
     public User(String token, String nickname, String phone, String hid, int order) {
         this.token = token;
@@ -17,6 +18,16 @@ public class User {
         this.phone = phone;
         this.hid = hid;
         this.order = order;
+        this.addedTime = "";
+    }
+
+    public User(String token, String nickname, String phone, String hid, int order, String addedTime) {
+        this.token = token;
+        this.nickname = nickname;
+        this.phone = phone;
+        this.hid = hid;
+        this.order = order;
+        this.addedTime = addedTime;
     }
 
     public static User fromString(String json) throws JSONException {
@@ -26,7 +37,8 @@ public class User {
                 obj.getString("nickname"),
                 obj.getString("phone"),
                 obj.getString("hid"),
-                obj.getInt("order"));
+                obj.getInt("order"),
+                obj.optString("addedTime", ""));
     }
 
     public String getToken() {
@@ -43,13 +55,13 @@ public class User {
 
     /**
      * 获取隐藏中间6位数字的手机号
-     * 例如：138****1234
+     * 例如：138******34
      */
     public String getMaskedPhone() {
         if (phone == null || phone.length() != 11) {
             return phone;
         }
-        return phone.substring(0, 3) + "****" + phone.substring(9);
+        return phone.substring(0, 3) + "******" + phone.substring(9);
     }
 
     public String getHid() {
@@ -72,9 +84,18 @@ public class User {
         this.order = order;
     }
 
+    public void setAddedTime(String currentTime) {
+        this.addedTime = currentTime;
+    }
+
+    public String getAddedTime() {
+        return addedTime;
+    }
+
     @Override
     public String toString() {
-        return String.format("{\"token\":\"%s\",\"nickname\":\"%s\",\"phone\":\"%s\",\"hid\":\"%s\",\"order\":%d}",
-                token, nickname, phone, hid, order);
+        return String.format(
+                "{\"token\":\"%s\",\"nickname\":\"%s\",\"phone\":\"%s\",\"hid\":\"%s\",\"order\":%d,\"addedTime\":\"%s\"}",
+                token, nickname, phone, hid, order, addedTime);
     }
 }
