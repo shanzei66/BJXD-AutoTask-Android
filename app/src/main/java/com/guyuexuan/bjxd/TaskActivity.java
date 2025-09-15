@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
@@ -49,6 +50,9 @@ public class TaskActivity extends AppCompatActivity {
         // 设置标题
         setTitle(AppUtils.getAppNameWithVersion(this));
 
+        // 保持屏幕常量
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
         storageUtil = new StorageUtil(this);
         initViews();
     }
@@ -58,6 +62,8 @@ public class TaskActivity extends AppCompatActivity {
         actionButton = findViewById(R.id.actionButton);
 
         actionButton.setOnClickListener(v -> {
+            // 关闭屏幕常量
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             if (taskThread != null && taskThread.isRunning()) {
                 actionButton.setText("等待线程结束……");
                 actionButton.setEnabled(false);
@@ -73,6 +79,8 @@ public class TaskActivity extends AppCompatActivity {
 
         taskThread = new TaskThread(users, storageUtil.getApiKey(), storageUtil, this::appendLog, () -> {
             runOnUiThread(() -> {
+                // 关闭屏幕常量
+                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 actionButton.setText("返回");
                 actionButton.setEnabled(true);
             });
